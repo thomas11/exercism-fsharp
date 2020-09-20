@@ -29,6 +29,15 @@ let children t =
     | Branch(id, c) -> c
     | Leaf id -> []
 
+
+// Latest benchmark (dotnet run -c Release)
+// My code is IMO much cleaner, but not much faster.
+//
+//|   Method |     Mean | Allocated |
+//|--------- |---------:|----------:|
+//| Baseline | 9.869 us |  14.76 KB |
+//|     Mine | 7.231 us |  11.53 KB |
+
 let rec treeify byParents id =
     let parent = List.tryFind (fun (p, _) -> id = p) byParents
     match parent with
@@ -36,14 +45,12 @@ let rec treeify byParents id =
     | None -> Leaf id
 
 let assertInputIsValid records =
-    let root =
-        records
-        |> List.where (fun r -> r.RecordId = 0)
-        |> List.exactlyOne
+    let (separateRoot, records') = List.partition (fun r -> r.RecordId = 0) records
 
+    let root = List.exactlyOne separateRoot
     if root.ParentId <> 0 then invalidArg "records" "Root node has parent"
 
-    if List.exists (fun r -> r.RecordId <> 0 && r.RecordId <= r.ParentId) records then invalidArg "records" "invalid parent" |> ignore
+    if List.exists (fun r -> r.RecordId <= r.ParentId) records' then invalidArg "records" "invalid parent" |> ignore
 
     let ids =
         records
@@ -52,15 +59,14 @@ let assertInputIsValid records =
     for i in 1 .. (List.length ids) - 1 do
         if ids.[i-1] + 1 <> ids.[i] then invalidArg "records" "non-consecutive ids" |> ignore
 
-    records
+    records'
 
 let buildTree (records: Record list) =
-    assertInputIsValid records |> ignore
+    let records' = assertInputIsValid records
 
     // [ (0, [1, 3, 5]), (1, [2, 4]), (3, [6])]
     let byParents =
-        records
-        |> List.filter (fun r -> r.RecordId <> 0)
+        records'
         |> List.groupBy (fun r -> r.ParentId)
         |> List.sortBy fst
         |> List.map (fun (p, c) -> (p, List.sortBy (fun r -> r.RecordId) c))
@@ -70,7 +76,8 @@ let buildTree (records: Record list) =
     | _ -> treeify byParents (fst byParents.[0])
 
 
-let buildTree' records =
+// The pre-existing method replaced by the above code
+let buildTreeOld records =
     let records' = List.sortBy (fun x -> x.RecordId) records
 
     if List.isEmpty records' then
