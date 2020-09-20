@@ -1,0 +1,1 @@
+Working through some exercises of the [Exercism F# track](https://exercism.io/my/tracks/fsharp).
