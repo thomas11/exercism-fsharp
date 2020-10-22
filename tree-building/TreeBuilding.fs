@@ -50,7 +50,7 @@ let rec treeify byParents id =
     | Some(id, c) -> Branch(id, List.map (fun r -> treeify byParents r.RecordId) c)
     | None -> Leaf id
 
-let assertInputIsValid records =
+let assertInputIsValidAndRemoveRoot records =
     let (separateRoot, records') = List.partition (fun r -> r.RecordId = 0) records
 
     let root = List.exactlyOne separateRoot
@@ -67,7 +67,7 @@ let assertInputIsValid records =
     records'
 
 let buildTree (records: Record list) =
-    let records' = assertInputIsValid records
+    let records' = assertInputIsValidAndRemoveRoot records
 
     // [ (0, [1, 3, 5]), (1, [2, 4]), (3, [6])]
     let byParents =
