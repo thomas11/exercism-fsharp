@@ -31,12 +31,18 @@ let children t =
 
 
 // Latest benchmark (dotnet run -c Release)
-// My code is IMO much cleaner, but not much faster.
-//
+
+// a0321ca: code is IMO much cleaner, but not much faster.
 //|   Method |     Mean | Allocated |
 //|--------- |---------:|----------:|
 //| Baseline | 9.869 us |  14.76 KB |
 //|     Mine | 7.231 us |  11.53 KB |
+
+// e7e8acd
+//|   Method |     Mean | Allocated |
+//|--------- |---------:|----------:|
+//| Baseline | 9.366 us |  14.76 KB |
+//|     Mine | 5.982 us |   9.63 KB |
 
 let rec treeify byParents id =
     let parent = List.tryFind (fun (p, _) -> id = p) byParents
