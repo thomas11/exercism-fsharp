@@ -52,12 +52,11 @@ let assertInputIsValid records =
 
     if List.exists (fun r -> r.RecordId <= r.ParentId) records' then invalidArg "records" "invalid parent" |> ignore
 
-    let ids =
-        records
-        |> List.map (fun r -> r.RecordId)
-        |> List.sort
-    for i in 1 .. (List.length ids) - 1 do
-        if ids.[i-1] + 1 <> ids.[i] then invalidArg "records" "non-consecutive ids" |> ignore
+    // A trick to check that all ids are consecutive, starting at 1: their sum must be the
+    // triangular number x*(x-1)/2, with x being the highest record id. Saves another sort+iterate.
+    let sumOfIds = List.sumBy (fun r -> r.RecordId) records'
+    let numRecords = List.length records
+    if sumOfIds <> (numRecords * (numRecords - 1)) / 2 then invalidArg "records" "non-consecutive ids" |> ignore
 
     records'
 
