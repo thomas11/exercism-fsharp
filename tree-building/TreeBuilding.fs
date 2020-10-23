@@ -44,34 +44,38 @@ let children t =
 //| Baseline | 9.366 us |  14.76 KB |
 //|     Mine | 5.982 us |   9.63 KB |
 
-let rec treeify byParents id =
-    let parent = List.tryFind (fun (p, _) -> id = p) byParents
-    match parent with
-    | Some(id, c) -> Branch(id, List.map (fun r -> treeify byParents r.RecordId) c)
-    | None -> Leaf id
 
-let assertInputIsValidAndRemoveRoot records =
-    let (separateRoot, records') = List.partition (fun r -> r.RecordId = 0) records
-
-    let root = List.exactlyOne separateRoot
+let private assertRootIsValid roots =
+    let root = List.exactlyOne roots
     if root.ParentId <> 0 then invalidArg "records" "Root node has parent"
 
-    if List.exists (fun r -> r.RecordId <= r.ParentId) records' then invalidArg "records" "invalid parent" |> ignore
+
+let private assertChildrenAreValid records =
+    if List.exists (fun r -> r.RecordId <= r.ParentId) records then invalidArg "records" "invalid parent" |> ignore
 
     // A trick to check that all ids are consecutive, starting at 1: their sum must be the
     // triangular number x*(x-1)/2, with x being the highest record id. Saves another sort+iterate.
-    let sumOfIds = List.sumBy (fun r -> r.RecordId) records'
-    let numRecords = List.length records
+    let sumOfIds = List.sumBy (fun r -> r.RecordId) records
+    let numRecords = (List.length records) + 1
     if sumOfIds <> (numRecords * (numRecords - 1)) / 2 then invalidArg "records" "non-consecutive ids" |> ignore
 
-    records'
+
+let rec private treeify byParents id =
+    let parent = List.tryFind (fun (p, _) -> id = p) byParents
+    match parent with
+    | Some(_, c) -> Branch(id, List.map (fun r -> treeify byParents r.RecordId) c)
+    | None -> Leaf id
+
 
 let buildTree (records: Record list) =
-    let records' = assertInputIsValidAndRemoveRoot records
+    let (root, children) = List.partition (fun r -> r.RecordId = 0) records
+
+    assertRootIsValid root
+    assertChildrenAreValid children
 
     // [ (0, [1, 3, 5]), (1, [2, 4]), (3, [6])]
     let byParents =
-        records'
+        children
         |> List.groupBy (fun r -> r.ParentId)
         |> List.sortBy fst
         |> List.map (fun (p, c) -> (p, List.sortBy (fun r -> r.RecordId) c))
@@ -79,49 +83,3 @@ let buildTree (records: Record list) =
     match byParents with
     | [] -> Leaf 0
     | _ -> treeify byParents (fst byParents.[0])
-
-
-// The pre-existing method replaced by the above code
-let buildTreeOld records =
-    let records' = List.sortBy (fun x -> x.RecordId) records
-
-    if List.isEmpty records' then
-        failwith "Empty input"
-    else
-        let root = records'.[0]
-        if (root.ParentId = 0 |> not) then
-            failwith "Root node is invalid"
-        else if (root.RecordId = 0 |> not) then
-            failwith "Root node is invalid"
-        else
-            let mutable prev = -1
-            let mutable leafs = []
-
-            for r in records' do
-                if (r.RecordId <> 0 && (r.ParentId > r.RecordId || r.ParentId = r.RecordId)) then
-                    failwith "Nodes with invalid parents"
-                else if r.RecordId <> prev + 1 then
-                    failwith "Non-continuous list"
-                else
-                    prev <- r.RecordId
-                    if (r.RecordId = 0)
-                    then leafs <- leafs @ [ (-1, r.RecordId) ]
-                    else leafs <- leafs @ [ (r.ParentId, r.RecordId) ]
-
-            let root = leafs.[0]
-
-            let grouped =
-                leafs
-                |> List.groupBy fst
-                |> List.map (fun (x, y) -> (x, List.map snd y))
-
-            let parents = List.map fst grouped
-            let map = grouped |> Map.ofSeq
-
-            let rec helper key =
-                if Map.containsKey key map
-                then Branch(key, List.map (fun i -> helper i) (Map.find key map))
-                else Leaf key
-
-            let root = helper 0
-            root
